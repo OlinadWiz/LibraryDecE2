@@ -54,9 +54,11 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             crossbuild-essential-armhf \
+            build-essential \
             meson \
             ninja-build \
             pkg-config \
+            pkgconf \
             binutils \
             libglib2.0-dev:armhf \
             libgstreamer1.0-dev:armhf \
@@ -75,6 +77,7 @@ jobs:
         shell: bash
         env:
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_PATH: /usr/lib/arm-linux-gnueabihf/pkgconfig
         run: |
           meson setup upstream/out upstream \
             --cross-file cross-armhf.ini \
@@ -106,4 +109,3 @@ jobs:
             jasontv-cenc-${{ matrix.decoder }}_*.ipk
             SHA256SUMS-${{ matrix.decoder }}.txt
           if-no-files-found: error
-
