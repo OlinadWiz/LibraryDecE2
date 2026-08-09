@@ -11,7 +11,7 @@ CDM and must only be used with content and keys the user is authorised to use.
 
 Build output:
 
-`jasontv-cenc-zgemmah7_1.0.0-r1_cortexa15hf-neon-vfpv4.ipk`
+`jasontv-cenc-zgemmah7_1.0.0-r2_cortexa15hf-neon-vfpv4.ipk`
 
 To add a receiver, extend the matrix in
 `.github/workflows/build-cenc-ipk.yml`. A target with another CPU ABI needs its
