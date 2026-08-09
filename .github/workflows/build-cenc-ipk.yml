@@ -27,7 +27,7 @@ jobs:
 
     env:
       CENC_VERSION: 1.0.0
-      CENC_REVISION: r3
+      CENC_REVISION: r4
       UPSTREAM_COMMIT: 445648a27dddd4c366af52a6a1f22ee9d14d1096
 
     steps:
@@ -98,6 +98,22 @@ jobs:
           source = c_file.read_text(encoding="utf-8")
           source = source.replace("#include <libxml/parser.h>\n", "")
           source = source.replace("#include <libxml/tree.h>\n", "")
+          source = source.replace("#include <stdio.h>\n", "#include <stdio.h>\n#include <stdarg.h>\n")
+          source = source.replace(
+              "typedef enum\n{",
+              "static void jtv_diag (const char *format, ...)\n"
+              "{\n"
+              "  FILE *file = fopen (\"/tmp/jasontv-cencdec.log\", \"a\");\n"
+              "  va_list args;\n"
+              "  if (!file) return;\n"
+              "  va_start (args, format);\n"
+              "  vfprintf (file, format, args);\n"
+              "  va_end (args);\n"
+              "  fputc ('\\n', file);\n"
+              "  fclose (file);\n"
+              "}\n\n"
+              "typedef enum\n{",
+          )
           source = source.replace(
               '#define CLEARKEY_PROTECTION_ID "e2719d58-a985-b3c9-781a-b030af78d30e"',
               '#define CLEARKEY_PROTECTION_ID "e2719d58-a985-b3c9-781a-b030af78d30e"\n'
@@ -130,6 +146,65 @@ jobs:
               source,
               flags=re.S,
           )
+          source = source.replace(
+              "  GstCencDrmType drm_type;\n};",
+              "  GstCencDrmType drm_type;\n  guint diag_samples;\n};",
+          )
+          source = source.replace(
+              "  self->drm_type = GST_DRM_UNKNOWN;\n}",
+              "  self->drm_type = GST_DRM_UNKNOWN;\n"
+              "  self->diag_samples = 0;\n"
+              "  jtv_diag (\"element_init\");\n}",
+          )
+          source = source.replace(
+              '          GST_DEBUG_OBJECT (self, "event carries ClearKey data");',
+              '          GST_DEBUG_OBJECT (self, "event carries ClearKey data");\n'
+              '          jtv_diag ("protection_event_supported");',
+          )
+          source = source.replace(
+              '    GST_ERROR_OBJECT (self, "Failed to open keyfile: %s", path);',
+              '    GST_ERROR_OBJECT (self, "Failed to open keyfile: %s", path);\n'
+              '    jtv_diag ("keyfile_open_failed");',
+          )
+          source = source.replace(
+              '    GST_ERROR_OBJECT (self, "Failed to read key from file %s", path);',
+              '    GST_ERROR_OBJECT (self, "Failed to read key from file %s", path);\n'
+              '    jtv_diag ("keyfile_invalid_size");',
+          )
+          source = source.replace(
+              "  g_ptr_array_add (self->keys, kp);\n\n  return kp;",
+              "  g_ptr_array_add (self->keys, kp);\n"
+              "  jtv_diag (\"key_loaded\");\n\n  return kp;",
+          )
+          source = source.replace(
+              '      GST_ERROR_OBJECT (self, "Failed to get GstProtection metadata from buffer");',
+              '      GST_ERROR_OBJECT (self, "Failed to get GstProtection metadata from buffer");\n'
+              '      jtv_diag ("protection_meta_missing");',
+          )
+          source = re.sub(
+              r'  if \(!keypair\) \{\n    gsize sz;\n    GST_ERROR_OBJECT \(self, "Failed to lookup key"\);\n    GST_MEMDUMP_OBJECT .*?\n    ret = GST_FLOW_NOT_SUPPORTED;',
+              '  if (!keypair) {\n'
+              '    GST_ERROR_OBJECT (self, "Failed to lookup key");\n'
+              '    jtv_diag ("key_lookup_failed");\n'
+              '    ret = GST_FLOW_NOT_SUPPORTED;',
+              source,
+              flags=re.S,
+          )
+          source = source.replace(
+              '    GST_ERROR_OBJECT (self, "Failed to init AES cipher");',
+              '    GST_ERROR_OBJECT (self, "Failed to init AES cipher");\n'
+              '    jtv_diag ("aes_init_failed");',
+          )
+          source = source.replace(
+              "out:\n  return ret;",
+              "out:\n"
+              "  if (self->diag_samples < 3) {\n"
+              "    jtv_diag (ret == GST_FLOW_OK ? \"sample_decrypted\" : \"sample_failed\");\n"
+              "    self->diag_samples++;\n"
+              "  }\n"
+              "  return ret;",
+              1,
+          )
           source = re.sub(
               r"if\(g_ascii_strcasecmp\(loc, \"dash/mpd\"\)==0.*?gst_cenc_decrypt_parse_pssh_box \(self, pssi\);\n        }",
               "if (system_id && (g_ascii_strcasecmp(system_id, CLEARKEY_PROTECTION_ID) == 0 ||\n"
@@ -145,6 +220,8 @@ jobs:
               raise SystemExit("Failed to remove upstream Marlin/libxml2 code")
           if "WIDEVINE_CENC_ID" not in source or "PLAYREADY_CENC_ID" not in source:
               raise SystemExit("Failed to add CENC compatibility system identifiers")
+          if "jtv_diag" not in source or "key_lookup_failed" not in source:
+              raise SystemExit("Failed to add native CENC diagnostics")
           c_file.write_text(source, encoding="utf-8")
           PY
 
