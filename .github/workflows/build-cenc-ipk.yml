@@ -5,6 +5,9 @@ on:
   push:
     paths:
       - "cenc/**"
+      - "build-ipk.sh"
+      - "cross-armhf.ini"
+      - "README.md"
       - ".github/workflows/build-cenc-ipk.yml"
 
 permissions:
@@ -21,7 +24,6 @@ jobs:
         include:
           - decoder: zgemmah7
             architecture: cortexa15hf-neon-vfpv4
-            cross_file: cenc/cross-armhf.ini
     env:
       CENC_VERSION: 1.0.0
       CENC_REVISION: r0
@@ -32,6 +34,19 @@ jobs:
         run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
 
       - uses: actions/checkout@v4
+
+      - name: Locate CENC build files
+        shell: bash
+        run: |
+          if [ -f cenc/cross-armhf.ini ] && [ -f cenc/build-ipk.sh ]; then
+            echo "CENC_DIR=cenc" >> "$GITHUB_ENV"
+          elif [ -f cross-armhf.ini ] && [ -f build-ipk.sh ]; then
+            echo "CENC_DIR=." >> "$GITHUB_ENV"
+          else
+            echo "Missing cross-armhf.ini or build-ipk.sh" >&2
+            find . -maxdepth 3 -type f -print
+            exit 1
+          fi
 
       - name: Install ARMHF cross toolchain and development sysroot
         shell: bash
@@ -57,7 +72,7 @@ jobs:
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
         run: |
           meson setup upstream/out upstream \
-            --cross-file "${{ matrix.cross_file }}" \
+            --cross-file "$CENC_DIR/cross-armhf.ini" \
             --buildtype=release --strip
           meson compile -C upstream/out
           arm-linux-gnueabihf-readelf -h upstream/out/src/libgstcencdec.so | tee readelf.txt
@@ -66,8 +81,8 @@ jobs:
       - name: Build decoder-specific IPK
         shell: bash
         run: |
-          chmod +x cenc/build-ipk.sh
-          cenc/build-ipk.sh \
+          chmod +x "$CENC_DIR/build-ipk.sh"
+          "$CENC_DIR/build-ipk.sh" \
             "${{ matrix.decoder }}" "$CENC_VERSION" "$CENC_REVISION" \
             "${{ matrix.architecture }}" upstream/out/src/libgstcencdec.so
           sha256sum jasontv-cenc-${{ matrix.decoder }}_*.ipk > SHA256SUMS-${{ matrix.decoder }}.txt
@@ -79,4 +94,3 @@ jobs:
             jasontv-cenc-${{ matrix.decoder }}_*.ipk
             SHA256SUMS-${{ matrix.decoder }}.txt
           if-no-files-found: error
-
