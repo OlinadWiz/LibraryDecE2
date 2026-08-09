@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "cenc/**"
       - "build-ipk.sh"
       - "cross-armhf.ini"
       - "README.md"
@@ -18,12 +17,14 @@ jobs:
     name: ${{ matrix.decoder }} / ${{ matrix.architecture }}
     runs-on: ubuntu-24.04
     container: debian:bookworm
+
     strategy:
       fail-fast: false
       matrix:
         include:
           - decoder: zgemmah7
             architecture: cortexa15hf-neon-vfpv4
+
     env:
       CENC_VERSION: 1.0.0
       CENC_REVISION: r0
@@ -31,22 +32,20 @@ jobs:
 
     steps:
       - name: Install checkout prerequisites
-        run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
 
-      - uses: actions/checkout@v4
+      - name: Checkout LibraryDecE2
+        uses: actions/checkout@v5
 
-      - name: Locate CENC build files
+      - name: Validate repository structure
         shell: bash
         run: |
-          if [ -f cenc/cross-armhf.ini ] && [ -f cenc/build-ipk.sh ]; then
-            echo "CENC_DIR=cenc" >> "$GITHUB_ENV"
-          elif [ -f cross-armhf.ini ] && [ -f build-ipk.sh ]; then
-            echo "CENC_DIR=." >> "$GITHUB_ENV"
-          else
-            echo "Missing cross-armhf.ini or build-ipk.sh" >&2
-            find . -maxdepth 3 -type f -print
-            exit 1
-          fi
+          test -f build-ipk.sh
+          test -f cross-armhf.ini
+          test -f README.md
+          echo "Repository structure is valid"
 
       - name: Install ARMHF cross toolchain and development sysroot
         shell: bash
@@ -54,9 +53,15 @@ jobs:
           dpkg --add-architecture armhf
           apt-get update
           apt-get install -y --no-install-recommends \
-            crossbuild-essential-armhf meson ninja-build pkg-config binutils \
-            libglib2.0-dev:armhf libgstreamer1.0-dev:armhf \
-            libgstreamer-plugins-base1.0-dev:armhf libxml2-dev:armhf \
+            crossbuild-essential-armhf \
+            meson \
+            ninja-build \
+            pkg-config \
+            binutils \
+            libglib2.0-dev:armhf \
+            libgstreamer1.0-dev:armhf \
+            libgstreamer-plugins-base1.0-dev:armhf \
+            libxml2-dev:armhf \
             libssl-dev:armhf
 
       - name: Fetch pinned CENC source
@@ -72,25 +77,33 @@ jobs:
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
         run: |
           meson setup upstream/out upstream \
-            --cross-file "$CENC_DIR/cross-armhf.ini" \
-            --buildtype=release --strip
+            --cross-file cross-armhf.ini \
+            --buildtype=release \
+            --strip
           meson compile -C upstream/out
+          test -f upstream/out/src/libgstcencdec.so
           arm-linux-gnueabihf-readelf -h upstream/out/src/libgstcencdec.so | tee readelf.txt
           grep -q 'Machine:.*ARM' readelf.txt
 
       - name: Build decoder-specific IPK
         shell: bash
         run: |
-          chmod +x "$CENC_DIR/build-ipk.sh"
-          "$CENC_DIR/build-ipk.sh" \
-            "${{ matrix.decoder }}" "$CENC_VERSION" "$CENC_REVISION" \
-            "${{ matrix.architecture }}" upstream/out/src/libgstcencdec.so
-          sha256sum jasontv-cenc-${{ matrix.decoder }}_*.ipk > SHA256SUMS-${{ matrix.decoder }}.txt
+          chmod +x build-ipk.sh
+          ./build-ipk.sh \
+            "${{ matrix.decoder }}" \
+            "$CENC_VERSION" \
+            "$CENC_REVISION" \
+            "${{ matrix.architecture }}" \
+            upstream/out/src/libgstcencdec.so
+          sha256sum jasontv-cenc-${{ matrix.decoder }}_*.ipk \
+            > SHA256SUMS-${{ matrix.decoder }}.txt
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload decoder IPK
+        uses: actions/upload-artifact@v4
         with:
           name: jasontv-cenc-${{ matrix.decoder }}-${{ env.CENC_VERSION }}-${{ env.CENC_REVISION }}
           path: |
             jasontv-cenc-${{ matrix.decoder }}_*.ipk
             SHA256SUMS-${{ matrix.decoder }}.txt
           if-no-files-found: error
+
