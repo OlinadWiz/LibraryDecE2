@@ -27,7 +27,7 @@ jobs:
 
     env:
       CENC_VERSION: 1.0.0
-      CENC_REVISION: r2
+      CENC_REVISION: r3
       UPSTREAM_COMMIT: 445648a27dddd4c366af52a6a1f22ee9d14d1096
 
     steps:
@@ -99,6 +99,12 @@ jobs:
           source = source.replace("#include <libxml/parser.h>\n", "")
           source = source.replace("#include <libxml/tree.h>\n", "")
           source = source.replace(
+              '#define CLEARKEY_PROTECTION_ID "e2719d58-a985-b3c9-781a-b030af78d30e"',
+              '#define CLEARKEY_PROTECTION_ID "e2719d58-a985-b3c9-781a-b030af78d30e"\n'
+              '#define WIDEVINE_CENC_ID "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"\n'
+              '#define PLAYREADY_CENC_ID "9a04f079-9840-4286-ab92-e65be0885f95"',
+          )
+          source = source.replace(
               '     "application/x-cenc, protection-system=(string)" CLEARKEY_PROTECTION_ID "; "\n'
               '     "application/x-cenc, protection-system=(string)" M_MPD_PROTECTION_ID "; "\n'
               '     "application/x-cenc, protection-system=(string)" M_PSSH_PROTECTION_ID)',
@@ -108,6 +114,16 @@ jobs:
               "  CLEARKEY_PROTECTION_ID,\n  M_MPD_PROTECTION_ID,\n  M_PSSH_PROTECTION_ID,\n  NULL",
               "  CLEARKEY_PROTECTION_ID,\n  NULL",
           )
+          source = source.replace(
+              '     "application/x-cenc, protection-system=(string)" CLEARKEY_PROTECTION_ID)',
+              '     "application/x-cenc, protection-system=(string)" CLEARKEY_PROTECTION_ID "; "\n'
+              '     "application/x-cenc, protection-system=(string)" WIDEVINE_CENC_ID "; "\n'
+              '     "application/x-cenc, protection-system=(string)" PLAYREADY_CENC_ID)',
+          )
+          source = source.replace(
+              "  CLEARKEY_PROTECTION_ID,\n  NULL",
+              "  CLEARKEY_PROTECTION_ID,\n  WIDEVINE_CENC_ID,\n  PLAYREADY_CENC_ID,\n  NULL",
+          )
           source = re.sub(
               r"static gboolean\ngst_cenc_decrypt_parse_content_protection_element .*?\n}\n\nstatic gboolean\ngst_cenc_decrypt_sink_event_handler",
               "static gboolean\ngst_cenc_decrypt_sink_event_handler",
@@ -116,7 +132,9 @@ jobs:
           )
           source = re.sub(
               r"if\(g_ascii_strcasecmp\(loc, \"dash/mpd\"\)==0.*?gst_cenc_decrypt_parse_pssh_box \(self, pssi\);\n        }",
-              "if (system_id && g_ascii_strcasecmp(system_id, CLEARKEY_PROTECTION_ID) == 0) {\n"
+              "if (system_id && (g_ascii_strcasecmp(system_id, CLEARKEY_PROTECTION_ID) == 0 ||\n"
+              "        g_ascii_strcasecmp(system_id, WIDEVINE_CENC_ID) == 0 ||\n"
+              "        g_ascii_strcasecmp(system_id, PLAYREADY_CENC_ID) == 0)) {\n"
               "          GST_DEBUG_OBJECT (self, \"event carries ClearKey data\");\n"
               "          self->drm_type = GST_DRM_CLEARKEY;\n"
               "        }",
@@ -125,6 +143,8 @@ jobs:
           )
           if "xmlReadMemory" in source or "gst_cenc_decrypt_parse_content_protection_element" in source:
               raise SystemExit("Failed to remove upstream Marlin/libxml2 code")
+          if "WIDEVINE_CENC_ID" not in source or "PLAYREADY_CENC_ID" not in source:
+              raise SystemExit("Failed to add CENC compatibility system identifiers")
           c_file.write_text(source, encoding="utf-8")
           PY
 
