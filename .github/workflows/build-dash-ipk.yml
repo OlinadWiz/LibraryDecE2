@@ -90,6 +90,8 @@ jobs:
             -Dauto_features=disabled \
             -Dbase=enabled \
             -Dgood=enabled \
+            -Dbad=disabled \
+            -Dugly=disabled \
             -Dgstreamer:tools=disabled \
             -Dgstreamer:tests=disabled \
             -Dgst-plugins-base:tools=disabled \
@@ -99,12 +101,15 @@ jobs:
             -Dgst-plugins-good:adaptivedemux2=enabled \
             -Dgst-plugins-good:soup-lookup-dep=true \
             -Dgst-plugins-good:soup-version=2
-          meson compile -C upstream/out subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
-          plugin=upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
+          meson compile -C upstream/out
+          plugin="$(find upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2 \
+            -type f -name 'libgstadaptivedemux2.so' -print -quit)"
+          test -n "$plugin"
           test -f "$plugin"
-          arm-linux-gnueabihf-readelf -h "$plugin" | tee dash-readelf.txt
+          cp "$plugin" libgstadaptivedemux2.so
+          arm-linux-gnueabihf-readelf -h libgstadaptivedemux2.so | tee dash-readelf.txt
           grep -q 'Machine:.*ARM' dash-readelf.txt
-          arm-linux-gnueabihf-readelf -d "$plugin" | tee dash-dynamic.txt
+          arm-linux-gnueabihf-readelf -d libgstadaptivedemux2.so | tee dash-dynamic.txt
           if grep -q 'libxml2.so' dash-dynamic.txt; then
             echo "ERROR: libxml2 must not be dynamically linked" >&2
             exit 1
@@ -117,7 +122,7 @@ jobs:
           dash/build-ipk.sh \
             "${{ matrix.decoder }}" "$DASH_VERSION" "$DASH_REVISION" \
             "${{ matrix.architecture }}" \
-            upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
+            libgstadaptivedemux2.so
           sha256sum jasontv-dash-${{ matrix.decoder }}_*.ipk \
             > SHA256SUMS-dash-${{ matrix.decoder }}.txt
 
