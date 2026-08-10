@@ -86,6 +86,7 @@ jobs:
         run: |
           meson setup upstream/out upstream \
             --cross-file dash/cross-armhf.ini \
+            --force-fallback-for=libxml-2.0 \
             --buildtype=release --strip \
             -Dauto_features=disabled \
             -Dbase=enabled \
@@ -100,7 +101,11 @@ jobs:
             -Dgst-plugins-good:examples=disabled \
             -Dgst-plugins-good:adaptivedemux2=enabled \
             -Dgst-plugins-good:soup-lookup-dep=true \
-            -Dgst-plugins-good:soup-version=2
+            -Dgst-plugins-good:soup-version=2 \
+            -Dlibxml2:default_library=static \
+            -Dlibxml2:icu=disabled \
+            -Dlibxml2:minimum=true \
+            -Dlibxml2:python=disabled
           meson compile -C upstream/out
           plugin="$(find upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2 \
             -type f -name 'libgstadaptivedemux2.so' -print -quit)"
