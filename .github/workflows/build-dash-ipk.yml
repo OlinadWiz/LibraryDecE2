@@ -104,9 +104,11 @@ jobs:
             -Dgst-plugins-good:soup-version=2 \
             -Dlibxml2:default_library=static \
             -Dlibxml2:icu=disabled \
-            -Dlibxml2:minimum=true \
+            -Dlibxml2:minimum=false \
+            -Dlibxml2:output=enabled \
             -Dlibxml2:python=disabled
-          meson compile -C upstream/out
+          ninja -C upstream/out \
+            subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
           plugin="$(find upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2 \
             -type f -name 'libgstadaptivedemux2.so' -print -quit)"
           test -n "$plugin"
