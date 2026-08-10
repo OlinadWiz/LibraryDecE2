@@ -1,0 +1,132 @@
+name: Build DASH IPK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "dash/**"
+      - ".github/workflows/build-dash-ipk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.decoder }} / ${{ matrix.architecture }}
+    runs-on: ubuntu-24.04
+    container: debian:bookworm
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - decoder: zgemmah7
+            architecture: cortexa15hf-neon-vfpv4
+
+    env:
+      DASH_VERSION: 1.0.0
+      DASH_REVISION: r0
+      GST_VERSION: 1.28.5
+
+    steps:
+      - name: Install checkout prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+
+      - name: Checkout LibraryDecE2
+        uses: actions/checkout@v5
+
+      - name: Validate repository structure
+        shell: bash
+        run: |
+          test -f dash/build-ipk.sh
+          test -f dash/cross-armhf.ini
+          test -f dash/README.md
+
+      - name: Install ARMHF toolchain and build dependencies
+        shell: bash
+        run: |
+          dpkg --add-architecture armhf
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            crossbuild-essential-armhf build-essential ninja-build \
+            python3 python3-pip python3-setuptools python3-wheel \
+            pkg-config pkgconf flex bison gettext \
+            libglib2.0-dev:armhf libxml2-dev:armhf \
+            libsoup2.4-dev:armhf zlib1g-dev:armhf liblzma-dev:armhf
+          python3 -m pip install --break-system-packages 'meson==1.7.2'
+
+      - name: Fetch matching GStreamer source
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "$GST_VERSION" \
+            https://github.com/GStreamer/gstreamer.git upstream
+          test "$(git -C upstream describe --tags --exact-match)" = "$GST_VERSION"
+
+      - name: Link libxml2 statically for legacy Enigma2 images
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("upstream/subprojects/gst-plugins-good/ext/adaptivedemux2/meson.build")
+          source = path.read_text(encoding="utf-8")
+          old = "adaptive_xml2_dep = dependency('libxml-2.0', version : '>= 2.8', allow_fallback: true,"
+          new = "adaptive_xml2_dep = dependency('libxml-2.0', version : '>= 2.8', static: true, allow_fallback: true,"
+          if old not in source:
+            raise SystemExit("Expected adaptivedemux2 libxml2 dependency not found")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          PY
+
+      - name: Configure and cross-compile adaptivedemux2
+        shell: bash
+        env:
+          PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_PATH: /usr/lib/arm-linux-gnueabihf/pkgconfig
+        run: |
+          meson setup upstream/out upstream \
+            --cross-file dash/cross-armhf.ini \
+            --buildtype=release --strip \
+            -Dauto_features=disabled \
+            -Dbase=enabled \
+            -Dgood=enabled \
+            -Dgstreamer:tools=disabled \
+            -Dgstreamer:tests=disabled \
+            -Dgst-plugins-base:tools=disabled \
+            -Dgst-plugins-base:tests=disabled \
+            -Dgst-plugins-good:tests=disabled \
+            -Dgst-plugins-good:examples=disabled \
+            -Dgst-plugins-good:adaptivedemux2=enabled \
+            -Dgst-plugins-good:soup-lookup-dep=true \
+            -Dgst-plugins-good:soup-version=2
+          meson compile -C upstream/out subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
+          plugin=upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
+          test -f "$plugin"
+          arm-linux-gnueabihf-readelf -h "$plugin" | tee dash-readelf.txt
+          grep -q 'Machine:.*ARM' dash-readelf.txt
+          arm-linux-gnueabihf-readelf -d "$plugin" | tee dash-dynamic.txt
+          if grep -q 'libxml2.so' dash-dynamic.txt; then
+            echo "ERROR: libxml2 must not be dynamically linked" >&2
+            exit 1
+          fi
+
+      - name: Build decoder-specific IPK
+        shell: bash
+        run: |
+          chmod +x dash/build-ipk.sh
+          dash/build-ipk.sh \
+            "${{ matrix.decoder }}" "$DASH_VERSION" "$DASH_REVISION" \
+            "${{ matrix.architecture }}" \
+            upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
+          sha256sum jasontv-dash-${{ matrix.decoder }}_*.ipk \
+            > SHA256SUMS-dash-${{ matrix.decoder }}.txt
+
+      - name: Upload decoder IPK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jasontv-dash-${{ matrix.decoder }}-${{ env.DASH_VERSION }}-${{ env.DASH_REVISION }}
+          path: |
+            jasontv-dash-${{ matrix.decoder }}_*.ipk
+            SHA256SUMS-dash-${{ matrix.decoder }}.txt
+            dash-dynamic.txt
+          if-no-files-found: error
