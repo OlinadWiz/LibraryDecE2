@@ -1,0 +1,9 @@
+Verifica sul decoder
+Copia sul decoder [detect-profile.sh](C:/Users/danil/PycharmProjects/JasonTV/native/detect-profile.sh), quindi esegui:
+chmod +x detect-profile.sh
+./detect-profile.sh
+Sul decoder attuale dovrebbe restituire:
+machine=armv7l
+gstreamer=1.26.10
+soup=2
+profile=armv7hf-neon-gst126-soup2
