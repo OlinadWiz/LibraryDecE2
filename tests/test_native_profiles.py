@@ -17,6 +17,7 @@ class NativeProfileTests(unittest.TestCase):
         self.assertEqual(profile["gstreamer_source"], "1.26.10")
         self.assertEqual(profile["soup_major"], 2)
         self.assertEqual(profile["libxml_output"], "true")
+        self.assertEqual(profile["libxml_python"], "false")
         self.assertIn("Ustym 4K PRO / openATV 8", profile["tested_receivers"])
 
     def test_libxml_output_matches_bundled_wrap_versions(self):
@@ -24,10 +25,13 @@ class NativeProfileTests(unittest.TestCase):
             profiles = {item["gstreamer_series"]: item for item in json.load(handle)["profiles"]}
         self.assertEqual(profiles["1.26"]["libxml_output"], "true")
         self.assertEqual(profiles["1.28"]["libxml_output"], "enabled")
+        self.assertEqual(profiles["1.26"]["libxml_python"], "false")
+        self.assertEqual(profiles["1.28"]["libxml_python"], "disabled")
         with open(os.path.join(ROOT, ".github", "workflows", "build-native-profiles.yml"),
                   encoding="utf-8") as handle:
             workflow = handle.read()
         self.assertIn('-Dlibxml2:output="$LIBXML_OUTPUT"', workflow)
+        self.assertIn('-Dlibxml2:python="$LIBXML_PYTHON"', workflow)
 
     def test_detector_recognizes_gstreamer_126(self):
         with open(os.path.join(ROOT, "native", "detect-profile.sh"), encoding="utf-8") as handle:
