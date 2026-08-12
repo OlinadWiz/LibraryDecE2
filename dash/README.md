@@ -1,12 +1,12 @@
 # JasonTV DASH backend
 
 GitHub Actions cross-compila il plugin ufficiale GStreamer
-`adaptivedemux2`/`dashdemux2` per Zgemma H7 ARMHF. Il sorgente e fissato alla
-release GStreamer 1.28.5, uguale al runtime del decoder.
+`adaptivedemux2`/`dashdemux2` per i profili ABI definiti in
+`../native-profiles.json`. Consulta anche `../native/README.md`.
 
 Artefatto iniziale:
 
-`jasontv-dash-zgemmah7_1.0.0-r0_cortexa15hf-neon-vfpv4.ipk`
+`jasontv-dash-armv7hf-neon-gst128-soup2_1.0.0-r1_cortexa15hf-neon-vfpv4.ipk`
 
 Dopo l'installazione verificare:
 
