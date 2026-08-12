@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "profiles": [
+    {
+      "id": "armv7hf-neon-gst128-soup2",
+      "enabled": true,
+      "package_arch": "cortexa15hf-neon-vfpv4",
+      "cross_file_cenc": "cenc/cross-armhf.ini",
+      "cross_file_dash": "dash/cross-armhf.ini",
+      "compiler_prefix": "arm-linux-gnueabihf",
+      "elf_machine": "ARM",
+      "runtime_machine": "armv7l",
+      "gstreamer_series": "1.28",
+      "gstreamer_source": "1.28.5",
+      "soup_major": 2,
+      "tested_receivers": ["Zgemma H7 / openATV 8"]
+    }
+  ]
+}
