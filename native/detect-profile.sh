@@ -11,6 +11,7 @@ elif find /usr/lib /lib -name 'libsoup-3.0.so*' -print -quit 2>/dev/null | grep 
 fi
 
 case "$machine:$gst:$soup" in
+    armv7l:1.26.*:2) profile=armv7hf-neon-gst126-soup2 ;;
     armv7l:1.28.*:2) profile=armv7hf-neon-gst128-soup2 ;;
     *) profile=unsupported ;;
 esac

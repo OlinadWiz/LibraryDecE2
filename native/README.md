@@ -3,9 +3,11 @@
 `native-profiles.json` is the source of truth for coordinated DASH and CENC
 builds. GitHub Actions builds one pair of IPKs for every enabled profile.
 
-The first supported profile is `armv7hf-neon-gst128-soup2`, tested on Zgemma
-H7 with openATV 8 and GStreamer 1.28.x. A profile describes an ABI family, not
-a receiver model. Never enable a new profile by changing only its name or IPK
+Supported ARM hard-float profiles include `armv7hf-neon-gst128-soup2`, tested
+on Zgemma H7 with openATV 8 and GStreamer 1.28.x, and
+`armv7hf-neon-gst126-soup2`, tested on Ustym 4K PRO with openATV 8 and
+GStreamer 1.26.10. A profile describes an ABI family, not a receiver model.
+Never enable a new profile by changing only its name or IPK
 architecture: provide the matching cross compiler, sysroot, Meson cross files,
 GStreamer source series and libsoup major version.
 
