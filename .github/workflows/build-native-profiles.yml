@@ -42,6 +42,7 @@ jobs:
       GST_SERIES: ${{ matrix.profile.gstreamer_series }}
       SOUP_MAJOR: ${{ matrix.profile.soup_major }}
       LIBXML_OUTPUT: ${{ matrix.profile.libxml_output }}
+      LIBXML_PYTHON: ${{ matrix.profile.libxml_python }}
       CENC_VERSION: 1.0.0
       CENC_REVISION: r5
       DASH_VERSION: 1.0.0
@@ -57,6 +58,7 @@ jobs:
           test -f "${{ matrix.profile.cross_file_dash }}"
           test "$SOUP_MAJOR" = 2
           case "$LIBXML_OUTPUT" in true|enabled) ;; *) exit 1;; esac
+          case "$LIBXML_PYTHON" in false|disabled) ;; *) exit 1;; esac
       - name: Install ARMHF build environment
         if: ${{ matrix.profile.compiler_prefix == 'arm-linux-gnueabihf' }}
         shell: bash
@@ -101,7 +103,7 @@ jobs:
             -Dgst-plugins-good:tests=disabled -Dgst-plugins-good:examples=disabled \
             -Dgst-plugins-good:adaptivedemux2=enabled -Dgst-plugins-good:soup-lookup-dep=true \
             -Dgst-plugins-good:soup-version="$SOUP_MAJOR" -Dlibxml2:default_library=static \
-            -Dlibxml2:icu=disabled -Dlibxml2:minimum=false -Dlibxml2:output="$LIBXML_OUTPUT" -Dlibxml2:python=disabled
+            -Dlibxml2:icu=disabled -Dlibxml2:minimum=false -Dlibxml2:output="$LIBXML_OUTPUT" -Dlibxml2:python="$LIBXML_PYTHON"
           ninja -C upstream/out subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
           so="$(find upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2 -name libgstadaptivedemux2.so -print -quit)"
           chmod +x dash/build-ipk.sh
