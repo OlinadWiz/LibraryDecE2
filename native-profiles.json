@@ -13,6 +13,7 @@
       "gstreamer_series": "1.28",
       "gstreamer_source": "1.28.5",
       "soup_major": 2,
+      "libxml_output": "enabled",
       "tested_receivers": ["Zgemma H7 / openATV 8"]
     },
     {
@@ -27,6 +28,7 @@
       "gstreamer_series": "1.26",
       "gstreamer_source": "1.26.10",
       "soup_major": 2,
+      "libxml_output": "true",
       "tested_receivers": ["Ustym 4K PRO / openATV 8"]
     }
   ]
