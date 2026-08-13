@@ -1,7 +1,19 @@
 # JasonTV native ABI profiles
 
 `native-profiles.json` is the source of truth for coordinated DASH and CENC
-builds. GitHub Actions builds one pair of IPKs for every enabled profile.
+builds. Each manual GitHub Actions run accepts one profile ID and builds only
+the corresponding pair of IPKs.
+
+Run one of these commands from a checkout connected to GitHub:
+
+```sh
+gh workflow run build-native-profiles.yml -f profile=armv7hf-neon-gst128-soup2
+gh workflow run build-native-profiles.yml -f profile=armv7hf-neon-gst126-soup2
+```
+
+Wait for or inspect the requested run with `gh run watch`. When adding a new
+profile to `native-profiles.json`, use the same command with its new `id`;
+existing profiles are not rebuilt.
 
 Supported ARM hard-float profiles include `armv7hf-neon-gst128-soup2`, tested
 on Zgemma H7 with openATV 8 and GStreamer 1.28.x, and
