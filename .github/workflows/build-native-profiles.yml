@@ -1,48 +1,50 @@
-name: Build native ABI profiles
+name: Build native ABI profile
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "native-profiles.json"
-      - "native/**"
-      - "cenc/**"
-      - "dash/**"
-      - ".github/workflows/build-native-profiles.yml"
+    inputs:
+      profile:
+        description: Profile ID from native-profiles.json
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  matrix:
+  profile:
     runs-on: ubuntu-24.04
     outputs:
-      profiles: ${{ steps.profiles.outputs.profiles }}
+      config: ${{ steps.profile.outputs.config }}
     steps:
       - uses: actions/checkout@v5
-      - id: profiles
+      - id: profile
         shell: bash
+        env:
+          REQUESTED_PROFILE: ${{ inputs.profile }}
         run: |
-          value="$(jq -c '[.profiles[] | select(.enabled == true)]' native-profiles.json)"
-          test "$(jq length <<<"$value")" -gt 0
-          echo "profiles=$value" >> "$GITHUB_OUTPUT"
+          matches="$(jq -c --arg id "$REQUESTED_PROFILE" \
+            '[.profiles[] | select(.enabled == true and .id == $id)]' native-profiles.json)"
+          if [ "$(jq length <<<"$matches")" -ne 1 ]; then
+            echo "Unknown or disabled native profile: $REQUESTED_PROFILE" >&2
+            echo "Enabled profiles:" >&2
+            jq -r '.profiles[] | select(.enabled == true) | "- " + .id' native-profiles.json >&2
+            exit 1
+          fi
+          echo "config=$(jq -c '.[0]' <<<"$matches")" >> "$GITHUB_OUTPUT"
 
   build:
-    needs: matrix
+    needs: profile
     runs-on: ubuntu-24.04
     container: debian:bookworm
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: ${{ fromJson(needs.matrix.outputs.profiles) }}
     env:
-      PROFILE: ${{ matrix.profile.id }}
-      PACKAGE_ARCH: ${{ matrix.profile.package_arch }}
-      GST_VERSION: ${{ matrix.profile.gstreamer_source }}
-      GST_SERIES: ${{ matrix.profile.gstreamer_series }}
-      SOUP_MAJOR: ${{ matrix.profile.soup_major }}
-      LIBXML_OUTPUT: ${{ matrix.profile.libxml_output }}
-      LIBXML_PYTHON: ${{ matrix.profile.libxml_python }}
+      PROFILE: ${{ fromJson(needs.profile.outputs.config).id }}
+      PACKAGE_ARCH: ${{ fromJson(needs.profile.outputs.config).package_arch }}
+      GST_VERSION: ${{ fromJson(needs.profile.outputs.config).gstreamer_source }}
+      GST_SERIES: ${{ fromJson(needs.profile.outputs.config).gstreamer_series }}
+      SOUP_MAJOR: ${{ fromJson(needs.profile.outputs.config).soup_major }}
+      LIBXML_OUTPUT: ${{ fromJson(needs.profile.outputs.config).libxml_output }}
+      LIBXML_PYTHON: ${{ fromJson(needs.profile.outputs.config).libxml_python }}
       CENC_VERSION: 1.0.0
       CENC_REVISION: r5
       DASH_VERSION: 1.0.0
@@ -54,13 +56,13 @@ jobs:
       - name: Validate profile
         shell: bash
         run: |
-          test -f "${{ matrix.profile.cross_file_cenc }}"
-          test -f "${{ matrix.profile.cross_file_dash }}"
+          test -f "${{ fromJson(needs.profile.outputs.config).cross_file_cenc }}"
+          test -f "${{ fromJson(needs.profile.outputs.config).cross_file_dash }}"
           test "$SOUP_MAJOR" = 2
           case "$LIBXML_OUTPUT" in true|enabled) ;; *) exit 1;; esac
           case "$LIBXML_PYTHON" in false|disabled) ;; *) exit 1;; esac
       - name: Install ARMHF build environment
-        if: ${{ matrix.profile.compiler_prefix == 'arm-linux-gnueabihf' }}
+        if: ${{ fromJson(needs.profile.outputs.config).compiler_prefix == 'arm-linux-gnueabihf' }}
         shell: bash
         run: |
           dpkg --add-architecture armhf
@@ -82,10 +84,10 @@ jobs:
           git -C cenc-upstream checkout "$CENC_COMMIT"
           cp -a cenc-upstream upstream
           python3 cenc/patch-source.py upstream
-          meson setup upstream/out upstream --cross-file "${{ matrix.profile.cross_file_cenc }}" --buildtype=release --strip
+          meson setup upstream/out upstream --cross-file "${{ fromJson(needs.profile.outputs.config).cross_file_cenc }}" --buildtype=release --strip
           meson compile -C upstream/out
           chmod +x cenc/build-ipk.sh
-          cenc/build-ipk.sh "$PROFILE" "$CENC_VERSION" "$CENC_REVISION" "$PACKAGE_ARCH" upstream/out/src/libgstcencdec.so "$GST_SERIES" "${{ matrix.profile.runtime_machine }}"
+          cenc/build-ipk.sh "$PROFILE" "$CENC_VERSION" "$CENC_REVISION" "$PACKAGE_ARCH" upstream/out/src/libgstcencdec.so "$GST_SERIES" "${{ fromJson(needs.profile.outputs.config).runtime_machine }}"
           rm -rf upstream cenc-upstream
       - name: Build DASH
         shell: bash
@@ -95,7 +97,7 @@ jobs:
         run: |
           git clone --depth 1 --branch "$GST_VERSION" https://github.com/GStreamer/gstreamer.git upstream
           python3 dash/patch-source.py upstream
-          meson setup upstream/out upstream --cross-file "${{ matrix.profile.cross_file_dash }}" \
+          meson setup upstream/out upstream --cross-file "${{ fromJson(needs.profile.outputs.config).cross_file_dash }}" \
             --force-fallback-for=libxml-2.0 --buildtype=release --strip \
             -Dauto_features=disabled -Dbase=enabled -Dgood=enabled -Dbad=disabled -Dugly=disabled \
             -Dgstreamer:tools=disabled -Dgstreamer:tests=disabled \
@@ -107,7 +109,7 @@ jobs:
           ninja -C upstream/out subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
           so="$(find upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2 -name libgstadaptivedemux2.so -print -quit)"
           chmod +x dash/build-ipk.sh
-          dash/build-ipk.sh "$PROFILE" "$DASH_VERSION" "$DASH_REVISION" "$PACKAGE_ARCH" "$so" "$GST_SERIES" "${{ matrix.profile.runtime_machine }}"
+          dash/build-ipk.sh "$PROFILE" "$DASH_VERSION" "$DASH_REVISION" "$PACKAGE_ARCH" "$so" "$GST_SERIES" "${{ fromJson(needs.profile.outputs.config).runtime_machine }}"
       - name: Verify artifacts
         shell: bash
         run: |
@@ -116,7 +118,7 @@ jobs:
           sha256sum jasontv-{cenc,dash}-*.ipk > "SHA256SUMS-$PROFILE.txt"
       - uses: actions/upload-artifact@v4
         with:
-          name: jasontv-native-${{ matrix.profile.id }}
+          name: jasontv-native-${{ inputs.profile }}
           path: |
             jasontv-cenc-*.ipk
             jasontv-dash-*.ipk
