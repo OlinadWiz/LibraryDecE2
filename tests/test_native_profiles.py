@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import unittest
 
 
@@ -49,6 +50,18 @@ class NativeProfileTests(unittest.TestCase):
         self.assertIn('.id == $id', workflow)
         self.assertNotIn("matrix.profile", workflow)
         self.assertNotIn("[.profiles[] | select(.enabled == true)]", workflow)
+
+    def test_workflow_dropdown_contains_all_enabled_profiles(self):
+        with open(os.path.join(ROOT, "native-profiles.json"), encoding="utf-8") as handle:
+            enabled = {
+                item["id"] for item in json.load(handle)["profiles"] if item["enabled"]
+            }
+        with open(os.path.join(ROOT, ".github", "workflows", "build-native-profiles.yml"),
+                  encoding="utf-8") as handle:
+            workflow = handle.read()
+        options_block = workflow.split("        options:\n", 1)[1].split("\n\n", 1)[0]
+        options = set(re.findall(r"^          - (\S+)$", options_block, re.MULTILINE))
+        self.assertEqual(options, enabled)
 
 
 if __name__ == "__main__":
