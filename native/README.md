@@ -4,7 +4,8 @@
 builds. Each manual GitHub Actions run accepts one profile ID and builds only
 the corresponding pair of IPKs.
 
-Run one of these commands from a checkout connected to GitHub:
+From the GitHub Actions page, select **Run workflow** and choose the receiver
+profile from the drop-down menu. The same build can be started from the CLI:
 
 ```sh
 gh workflow run build-native-profiles.yml -f profile=armv7hf-neon-gst128-soup2
@@ -12,8 +13,8 @@ gh workflow run build-native-profiles.yml -f profile=armv7hf-neon-gst126-soup2
 ```
 
 Wait for or inspect the requested run with `gh run watch`. When adding a new
-profile to `native-profiles.json`, use the same command with its new `id`;
-existing profiles are not rebuilt.
+profile to `native-profiles.json`, also add its `id` to the workflow input
+options. Existing profiles are not rebuilt.
 
 Supported ARM hard-float profiles include `armv7hf-neon-gst128-soup2`, tested
 on Zgemma H7 with openATV 8 and GStreamer 1.28.x, and
