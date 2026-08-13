@@ -41,6 +41,15 @@ class NativeProfileTests(unittest.TestCase):
             detector,
         )
 
+    def test_workflow_builds_only_requested_profile(self):
+        with open(os.path.join(ROOT, ".github", "workflows", "build-native-profiles.yml"),
+                  encoding="utf-8") as handle:
+            workflow = handle.read()
+        self.assertIn("REQUESTED_PROFILE: ${{ inputs.profile }}", workflow)
+        self.assertIn('.id == $id', workflow)
+        self.assertNotIn("matrix.profile", workflow)
+        self.assertNotIn("[.profiles[] | select(.enabled == true)]", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
