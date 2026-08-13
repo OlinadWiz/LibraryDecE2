@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: Profile ID from native-profiles.json
+        description: Profilo nativo da compilare
         required: true
-        type: string
+        type: choice
+        options:
+          - armv7hf-neon-gst128-soup2
+          - armv7hf-neon-gst126-soup2
 
 permissions:
   contents: read
