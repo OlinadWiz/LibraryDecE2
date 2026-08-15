@@ -10,6 +10,7 @@ on:
         options:
           - armv7hf-neon-gst128-soup2
           - armv7hf-neon-gst126-soup2
+          - armv7hf-neon-gst122-soup2
 
 permissions:
   contents: read
