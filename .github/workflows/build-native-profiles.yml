@@ -101,14 +101,20 @@ jobs:
         run: |
           git clone --depth 1 --branch "$GST_VERSION" https://github.com/GStreamer/gstreamer.git upstream
           python3 dash/patch-source.py upstream
+          SOUP_OPTIONS=()
+          if [ "$GST_SERIES" != "1.22" ]; then
+            SOUP_OPTIONS+=(
+              -Dgst-plugins-good:soup-lookup-dep=true
+              -Dgst-plugins-good:soup-version="$SOUP_MAJOR"
+            )
+          fi
           meson setup upstream/out upstream --cross-file "${{ fromJson(needs.profile.outputs.config).cross_file_dash }}" \
             --force-fallback-for=libxml-2.0 --buildtype=release --strip \
             -Dauto_features=disabled -Dbase=enabled -Dgood=enabled -Dbad=disabled -Dugly=disabled \
             -Dgstreamer:tools=disabled -Dgstreamer:tests=disabled \
             -Dgst-plugins-base:tools=disabled -Dgst-plugins-base:tests=disabled \
             -Dgst-plugins-good:tests=disabled -Dgst-plugins-good:examples=disabled \
-            -Dgst-plugins-good:adaptivedemux2=enabled -Dgst-plugins-good:soup-lookup-dep=true \
-            -Dgst-plugins-good:soup-version="$SOUP_MAJOR" -Dlibxml2:default_library=static \
+            -Dgst-plugins-good:adaptivedemux2=enabled "${SOUP_OPTIONS[@]}" -Dlibxml2:default_library=static \
             -Dlibxml2:icu=disabled -Dlibxml2:minimum=false -Dlibxml2:output="$LIBXML_OUTPUT" -Dlibxml2:python="$LIBXML_PYTHON"
           ninja -C upstream/out subprojects/gst-plugins-good/ext/adaptivedemux2/libgstadaptivedemux2.so
           so="$(find upstream/out/subprojects/gst-plugins-good/ext/adaptivedemux2 -name libgstadaptivedemux2.so -print -quit)"
