@@ -100,7 +100,10 @@ jobs:
           PKG_CONFIG_PATH: /usr/lib/arm-linux-gnueabihf/pkgconfig
         run: |
           git clone --depth 1 --branch "$GST_VERSION" https://github.com/GStreamer/gstreamer.git upstream
-          python3 dash/patch-source.py upstream
+          if [ "$GST_SERIES" = "1.22" ]; then
+            (cd upstream && meson subprojects download libxml2)
+          fi
+          python3 dash/patch-source.py upstream "$GST_SERIES"
           SOUP_OPTIONS=()
           LIBXML_OPTIONS=()
           if [ "$GST_SERIES" != "1.22" ]; then
